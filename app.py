@@ -3,7 +3,7 @@ import requests
 import json
 import time
 from datetime import datetime
-from google import genai
+import google.generativeai as genai
 
 # ==========================================
 # 1. Page Configuration & Chat History Init
