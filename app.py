@@ -36,6 +36,7 @@ with st.sidebar:
     st.header("⚙️ Settings")
     gemini_api_key = st.text_input("Google Gemini API Key", type="password")
     sleeper_username = st.text_input("Sleeper Username")
+    sleeper_league_id = st.text_input("Sleeper League ID (Optional)")
     
     st.markdown("---")
     
@@ -51,44 +52,54 @@ with st.sidebar:
 
     st.markdown("---")
     
-    # Sleeper 로스터 연동
-    if sleeper_username:
+    # Sleeper 로스터 연동 (League ID direct OR Username)
+    if sleeper_username or sleeper_league_id:
         with st.spinner("Fetching Sleeper Roster..."):
             try:
-                user_res = requests.get(f"https://api.sleeper.app/v1/user/{sleeper_username}").json()
-                if user_res and "user_id" in user_res:
-                    user_id = user_res["user_id"]
+                target_league_id = sleeper_league_id.strip() if sleeper_league_id else None
+                user_id = None
+
+                if sleeper_username:
+                    user_res = requests.get(f"https://api.sleeper.app/v1/user/{sleeper_username}").json()
+                    if user_res and "user_id" in user_res:
+                        user_id = user_res["user_id"]
+
+                # League ID를 직접 넣지 않은 경우 Username 기반으로 조회
+                if not target_league_id and user_id:
                     leagues = requests.get(f"https://api.sleeper.app/v1/user/{user_id}/leagues/nfl/2026").json()
-                    
                     if not leagues:
                         leagues = requests.get(f"https://api.sleeper.app/v1/user/{user_id}/leagues/nfl/2025").json()
-
                     if leagues:
-                        league_id = leagues[0]["league_id"]
-                        rosters = requests.get(f"https://api.sleeper.app/v1/league/{league_id}/rosters").json()
+                        target_league_id = leagues[0]["league_id"]
+
+                if target_league_id:
+                    rosters = requests.get(f"https://api.sleeper.app/v1/league/{target_league_id}/rosters").json()
+                    
+                    user_roster = None
+                    if user_id:
                         user_roster = next((r for r in rosters if r.get("owner_id") == user_id), None)
+                    if not user_roster and rosters:
+                        user_roster = rosters[0]
 
-                        if user_roster and user_roster.get("players"):
-                            all_players = fetch_all_sleeper_players()
-                            player_names = []
-                            for pid in user_roster["players"]:
-                                p_info = all_players.get(pid, {})
-                                name = p_info.get("full_name", pid)
-                                pos = p_info.get("position", "")
-                                team = p_info.get("team", "FA")
-                                player_names.append(f"{name} ({pos} - {team})")
+                    if user_roster and user_roster.get("players"):
+                        all_players = fetch_all_sleeper_players()
+                        player_names = []
+                        for pid in user_roster["players"]:
+                            p_info = all_players.get(pid, {})
+                            name = p_info.get("full_name", pid)
+                            pos = p_info.get("position", "")
+                            team = p_info.get("team", "FA")
+                            player_names.append(f"{name} ({pos} - {team})")
 
-                            st.session_state["my_players"] = player_names
-                            st.success(f"Loaded {len(player_names)} players from {leagues[0].get('name', 'League')}")
-                            with st.expander("View My Roster"):
-                                for p in player_names:
-                                    st.write(f"- {p}")
-                        else:
-                            st.info("No active players found in roster.")
+                        st.session_state["my_players"] = player_names
+                        st.success(f"Loaded {len(player_names)} players (League ID: {target_league_id})")
+                        with st.expander("View My Roster"):
+                            for p in player_names:
+                                st.write(f"- {p}")
                     else:
-                        st.warning("No leagues found for this user.")
+                        st.info("No active players found in roster.")
                 else:
-                    st.error("Invalid Sleeper Username.")
+                    st.warning("No active leagues found for this user/ID.")
             except Exception as e:
                 st.error(f"Error fetching Sleeper data: {e}")
 
