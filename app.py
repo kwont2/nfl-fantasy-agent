@@ -184,7 +184,7 @@ STRICT FACT-CHECKING & HALLUCINATION PREVENTION:
 
         try:
             response = client.models.generate_content(
-                model="gemini-3.5-flash",
+                model="gemini-3.6-flash",
                 contents=user_prompt,
                 config={
                     "system_instruction": system_instruction,
