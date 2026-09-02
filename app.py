@@ -52,7 +52,7 @@ with st.sidebar:
 
     st.markdown("---")
     
-    # Sleeper 로스터 연동 (League ID direct OR Username)
+    # Sleeper 로스터 연동 (League ID 또는 Username)
     if sleeper_username or sleeper_league_id:
         with st.spinner("Fetching Sleeper Roster..."):
             try:
@@ -64,7 +64,7 @@ with st.sidebar:
                     if user_res and "user_id" in user_res:
                         user_id = user_res["user_id"]
 
-                # League ID를 직접 넣지 않은 경우 Username 기반으로 조회
+                # League ID를 직접 입력하지 않은 경우 Username 기반으로 2026/2025 리그 조회
                 if not target_league_id and user_id:
                     leagues = requests.get(f"https://api.sleeper.app/v1/user/{user_id}/leagues/nfl/2026").json()
                     if not leagues:
@@ -126,7 +126,8 @@ if user_prompt := st.chat_input("Ask about 2026 Draft ADPs, Sleeper Picks, Match
         status_placeholder.markdown("🧠 *Executing Deep 2026 Live Search (FantasyPros, PFF, Rotoworld, Athletic, Weather, Matchups)...*")
 
         try:
-            client = genai.Client(api_key=gemini_api_key)
+            genai.configure(api_key=gemini_api_key)
+            model = genai.GenerativeModel('gemini-1.5-pro')
         except Exception as e:
             status_placeholder.error(f"Client Init Error: {e}")
             st.stop()
@@ -183,14 +184,8 @@ STRICT FACT-CHECKING & HALLUCINATION PREVENTION:
 """
 
         try:
-            response = client.models.generate_content(
-                model="gemini-3.7-flash",
-                contents=user_prompt,
-                config={
-                    "system_instruction": system_instruction,
-                    "tools": [{"google_search": {}}],
-                    "temperature": 0.1
-                }
+            response = model.generate_content(
+                f"{system_instruction}\n\nUser Question: {user_prompt}"
             )
             response_text = response.text
         except Exception as e:
@@ -198,13 +193,8 @@ STRICT FACT-CHECKING & HALLUCINATION PREVENTION:
                 status_placeholder.markdown("⚠️ *Quota limit reached. Retrying in 3 seconds...*")
                 time.sleep(3)
                 try:
-                    response = client.models.generate_content(
-                        model="gemini-3.7-flash",
-                        contents=user_prompt,
-                        config={
-                            "system_instruction": system_instruction,
-                            "temperature": 0.1
-                        }
+                    response = model.generate_content(
+                        f"{system_instruction}\n\nUser Question: {user_prompt}"
                     )
                     response_text = response.text
                 except Exception as fallback_err:
