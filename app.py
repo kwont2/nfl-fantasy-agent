@@ -3,7 +3,7 @@ import requests
 import json
 import time
 from datetime import datetime
-import google.generativeai as genai
+from google import genai
 
 # ==========================================
 # 1. Page Configuration & Chat History Init
@@ -126,8 +126,7 @@ if user_prompt := st.chat_input("Ask about 2026 Draft ADPs, Sleeper Picks, Match
         status_placeholder.markdown("🧠 *Executing Deep 2026 Live Search (FantasyPros, PFF, Rotoworld, Athletic, Weather, Matchups)...*")
 
         try:
-            genai.configure(api_key=gemini_api_key)
-            model = genai.GenerativeModel('gemini-1.5-pro')
+            client = genai.Client(api_key=gemini_api_key)
         except Exception as e:
             status_placeholder.error(f"Client Init Error: {e}")
             st.stop()
@@ -184,8 +183,14 @@ STRICT FACT-CHECKING & HALLUCINATION PREVENTION:
 """
 
         try:
-            response = model.generate_content(
-                f"{system_instruction}\n\nUser Question: {user_prompt}"
+            response = client.models.generate_content(
+                model="gemini-3.5-flash",
+                contents=user_prompt,
+                config={
+                    "system_instruction": system_instruction,
+                    "tools": [{"google_search": {}}],
+                    "temperature": 0.1
+                }
             )
             response_text = response.text
         except Exception as e:
@@ -193,8 +198,13 @@ STRICT FACT-CHECKING & HALLUCINATION PREVENTION:
                 status_placeholder.markdown("⚠️ *Quota limit reached. Retrying in 3 seconds...*")
                 time.sleep(3)
                 try:
-                    response = model.generate_content(
-                        f"{system_instruction}\n\nUser Question: {user_prompt}"
+                    response = client.models.generate_content(
+                        model="gemini-3.5-flash",
+                        contents=user_prompt,
+                        config={
+                            "system_instruction": system_instruction,
+                            "temperature": 0.1
+                        }
                     )
                     response_text = response.text
                 except Exception as fallback_err:
